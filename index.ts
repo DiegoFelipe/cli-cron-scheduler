@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { CronJob } from "cron";
 import { exec } from "child_process";
 import { Command } from "commander";
