@@ -1,86 +1,114 @@
-# 🖥️ Cron Scheduler CLI By Diego Felipe (<diegofelipe.14@gmail.com>)
+# 🕰️ Cron Scheduler CLI
 
-A simple and modern CLI tool to schedule and execute cron jobs for shell scripts. This package allows you to schedule cron jobs directly from the command line, executing shell scripts at specified intervals.
+By Diego Felipe (<diegofelipe.14@gmail.com>)
 
-## Features
+A powerful and flexible CLI tool to schedule cron jobs, handle retries, log outputs, and send email notifications on failures or specific outputs.
 
-- Schedule cron jobs using cron expressions.
-- Run shell scripts at specified intervals.
-- Simple and easy-to-use CLI interface.
-- Built with TypeScript and the `cron` package for reliability and type safety.
+## 🚀 Features
 
-## 📦 Installation
+- **Schedule Cron Jobs** with custom scripts.
+- **Retry Mechanism** for failed jobs.
+- **Email Notifications** on failure or specific output conditions.
+- **Logging** of job outputs to a file.
 
-To install the Cron Scheduler CLI, simply install it globally via npm:
+---
+
+## ⚙️ Installation
 
 ```bash
 npm install -g cron-scheduler
 ```
 
-## Usage
+---
 
-Schedule a Cron Job
-To schedule a cron job, use the schedule command with two arguments:
+## 🔧 Setup
 
-script: The path to the shell script you want to run.
-cronExpression: The cron expression defining the schedule (e.g., \* \* \* \* \* for every minute).
-Example usage:
+1. Create a `.env` file in your project root based on the provided `.env.sample`:
 
-```bash
-cron-scheduler schedule /path/to/your/script.sh "* * * * *"
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=465
+SMTP_USER=your-email@example.com
+SMTP_PASS=your-email-password
 ```
 
-This command will run your script.sh every minute.
-
-## Example Cron Expressions
+2. Ensure that your shell script files have executable permissions:
 
 ```bash
-* * * * *: Every minute.
-0 * * * *: Every hour at the start of the hour.
-0 0 * * *: Every day at midnight.
-0 0 * * 0: Every Sunday at midnight.
+chmod +x your-script.sh
 ```
 
-Example Shell Script
-Here’s a simple shell script (script.sh) that could be executed by the scheduler:
+---
+
+## 📖 Usage
+
+### 1. **Schedule a Job**
 
 ```bash
-#!/bin/bash
-echo "Hello, Cron!"
+cron-scheduler schedule ./backup.sh "0 0 * * *" --log ./backup.log --on-fail-email user@example.com --retry 3 --on-output "success:notify,fail:retry"
 ```
 
-Make sure to give execute permissions to your shell script:
+- `./backup.sh`: Path to your shell script.
+- `"0 0 * * *"`: Cron expression (daily at midnight).
+- `--log`: (Optional) Path to the log file.
+- `--on-fail-email`: (Optional) Email address to notify on failure.
+- `--retry`: (Optional) Number of retry attempts on failure.
+- `--on-output`: (Optional) Define output conditions and actions.
+  - Example: `"success:notify,fail:retry"`
+
+## ✅ Examples
+
+### Example 1: Basic Job with Logging
 
 ```bash
-chmod +x /path/to/your/script.sh
+cron-scheduler schedule ./script.sh "*/5 * * * *" --log ./script.log
 ```
 
-## Development
+- Runs the script every 5 minutes and logs the output.
 
-If you want to contribute to this project or modify it for your needs, follow the steps below.
-
-### Prerequisites
-
-- Node.js (>=14.x.x)
-- npm (>=6.x.x)
-
-### Clone the Repository
+### Example 2: Notify on Failure
 
 ```bash
-git clone https://github.com/DiegoFelipe/cron-scheduler.git
-cd cron-scheduler
+cron-scheduler schedule ./script.sh "0 1 * * *" --on-fail-email admin@example.com
 ```
 
-### Install Dependencies
+- Runs the script daily at 1 AM and sends an email if it fails.
+
+### Example 3: Retry on Failure and Notify on Success
 
 ```bash
-npm install
+cron-scheduler schedule ./script.sh "0 12 * * 1" --retry 2 --on-output "success:notify"
 ```
 
-## Build the Project
+- Runs every Monday at noon, retries twice on failure, and notifies on success.
 
-To compile the TypeScript code into JavaScript:
+---
 
-```bash
-npm run build
-```
+## 📄 Environment Variables
+
+Ensure these are correctly configured in your `.env` file:
+
+- `SMTP_HOST`: SMTP server host.
+- `SMTP_PORT`: SMTP server port (e.g., 465 for SSL).
+- `SMTP_USER`: SMTP username (usually your email).
+- `SMTP_PASS`: SMTP password.
+
+---
+
+## ❓ Troubleshooting
+
+- **Email Not Sending**: Check SMTP configurations in your `.env` file.
+- **Script Not Executing**: Ensure the script has executable permissions (`chmod +x`).
+- **Global CLI Not Recognized**: Try re-installing globally with `npm install -g cron-scheduler` and ensure your system PATH includes npm global binaries.
+
+---
+
+## 📬 Contributions
+
+Pull requests are welcome! For major changes, open an issue first to discuss what you would like to change.
+
+---
+
+## 📄 License
+
+[MIT](LICENSE)

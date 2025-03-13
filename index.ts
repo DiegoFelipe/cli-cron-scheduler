@@ -1,53 +1,97 @@
 #!/usr/bin/env node
-
-import { CronJob } from "cron";
-import { exec } from "child_process";
 import { Command } from "commander";
-import { access, constants } from "fs";
+import cron from "cron";
+import { exec } from "child_process";
+import fs from "fs";
+import { sendEmail } from "./email";
 
-// Initialize Commander for CLI
 const program = new Command();
-program
-  .name("cron-scheduler")
-  .description("A CLI tool to schedule cron jobs for shell scripts")
-  .version("1.0.0");
 
-// Define the command to schedule a cron job
-program
-  .command("schedule")
-  .description("Schedule a cron job to run a shell script")
-  .argument("<script>", "Path to the .sh script")
-  .argument("<cronExpression>", "Cron expression to schedule the job")
-  .action((script: string, cronExpression: string) => {
-    // Validate the script exists
-    access(script, constants.F_OK, (err: any) => {
-      if (err) {
-        console.error(`Script file not found: ${script}`);
-        process.exit(1);
+interface JobOptions {
+  log?: string;
+  onFailEmail?: string;
+  retry?: number;
+  onOutput?: Record<string, string>;
+}
+
+const logOutput = (filePath: string, data: string) => {
+  fs.appendFileSync(filePath, `${new Date().toISOString()} - ${data}\n`);
+};
+
+const executeScript = async (
+  scriptPath: string,
+  options: JobOptions,
+  attempt = 1
+): Promise<void> => {
+  exec(`bash ${scriptPath}`, (error, stdout, stderr) => {
+    if (options.log) {
+      logOutput(options.log, stdout || stderr);
+    }
+
+    if (error) {
+      if (options.onFailEmail) {
+        sendEmail({
+          host: process.env.SMTP_HOST || "",
+          port: Number(process.env.SMTP_PORT) || 465,
+          username: process.env.SMTP_USER || "",
+          password: process.env.SMTP_PASS || "",
+          from: process.env.SMTP_USER || "",
+          to: options.onFailEmail,
+          subject: "Cron Job Failed",
+          message: `Error: ${stderr}`,
+        });
       }
 
-      // Schedule the cron job using the provided cron expression
-      const job = new CronJob(cronExpression, () => {
-        console.log(`Executing cron job for script: ${script}`);
-
-        // Execute the shell script using child_process
-        exec(`bash ${script}`, (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Error executing script: ${error.message}`);
-            return;
+      if (options.retry && attempt <= options.retry) {
+        console.log(`Retrying (${attempt}/${options.retry})...`);
+        executeScript(scriptPath, options, attempt + 1);
+      }
+    } else if (stdout && options.onOutput) {
+      Object.entries(options.onOutput).forEach(([key, action]) => {
+        if (stdout.includes(key)) {
+          if (action === "notify" && options.onFailEmail) {
+            sendEmail({
+              host: process.env.SMTP_HOST || "",
+              port: Number(process.env.SMTP_PORT) || 465,
+              username: process.env.SMTP_USER || "",
+              password: process.env.SMTP_PASS || "",
+              from: process.env.SMTP_USER || "",
+              to: options.onFailEmail,
+              subject: "Cron Job Output Notification",
+              message: `Output matched: ${key}`,
+            });
           }
-          if (stderr) {
-            console.error(`stderr: ${stderr}`);
-            return;
-          }
-          console.log(`stdout: ${stdout}`);
-        });
+        }
       });
+    }
+  });
+};
 
-      job.start();
+program
+  .command("schedule")
+  .description("Schedule a cron job")
+  .argument("<script>", "Path to the shell script")
+  .argument("<cron>", "Cron expression")
+  .option("--log <log>", "Log file path")
+  .option("--on-fail-email <email>", "Email to notify on failure")
+  .option("--retry <number>", "Number of retries on failure", parseInt)
+  .option("--on-output <output>", "Output condition actions, e.g., 'success:notify,fail:retry'")
+  .action((script, cronExpression, options) => {
+    const jobOptions: JobOptions = {
+      log: options.log,
+      onFailEmail: options.onFailEmail,
+      retry: options.retry || 0,
+      onOutput: options.onOutput
+        ? Object.fromEntries(options.onOutput.split(",").map((pair: string) => pair.split(":")))
+        : {},
+    };
 
-      console.log(`Scheduled job for script: ${script} with cron expression: ${cronExpression}`);
+    const job = new cron.CronJob(cronExpression, () => {
+      executeScript(script, jobOptions);
     });
+
+    job.start();
+    console.log(`Scheduled ${script} with cron: '${cronExpression}'`);
   });
 
 program.parse(process.argv);
