@@ -67,7 +67,7 @@ If you want to contribute to this project or modify it for your needs, follow th
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/cron-scheduler.git
+git clone https://github.com/DiegoFelipe/cron-scheduler.git
 cd cron-scheduler
 ```
 
